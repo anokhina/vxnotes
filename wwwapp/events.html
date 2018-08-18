@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<!--
+Copyright 2017 Veronica Anokhina.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<html>
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style type="text/css">
+html, body {
+    /*height:99%;*/
+    width:100%;
+    padding:0px;
+    margin:0px;
+}   
+.inline {
+    display: inline-block;
+    padding-top: 2px;
+}  
+textarea { 
+    resize:vertical; 
+    padding: 0px;
+    margin: 0px;    
+}
+
+/* Style the tab */
+div.tab {
+    overflow: hidden;
+    border: 1px solid #ccc;
+    background-color: #e5e5e5;
+}
+
+/* Style the buttons inside the tab */
+div.tab button {
+    background-color: inherit;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    transition: 0.3s;
+    font-size: large;
+}
+
+/* Change background color of buttons on hover */
+div.tab button:hover {
+    background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+div.tab button.active {
+    background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+    display: none;
+    padding: 0px;
+    border: 1px solid #ccc;
+    border-top: none;
+    background-color: #f1f1f1;
+}
+
+.tcontent {
+    padding: 5px;
+}
+
+/* Style the close button */
+.topright {
+    float: right;
+    cursor: pointer;
+    font-size: large;
+    padding: 0px 4px 0px 0px;
+}
+
+.topright:hover {color: red;}
+
+#opstatus {
+    background-color: #bbb;
+}
+.controldiv {
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 200;
+}
+.controlleddiv {
+    position: relative;
+    top: 50px;
+}
+.rowbg {
+    background-color: #ccc;
+}
+.rowbgm {
+    background-color: #ddd;
+}
+.rowbgl {
+    background-color: #f1f1f1;
+}
+.Reset {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+#drop_zone {
+    border: 2px dashed #bbb;
+    -moz-border-radius: 5px;
+    -webkit-border-radius: 5px;
+    border-radius: 5px;
+    padding: 25px;
+    text-align: center;
+    color: #bbb;
+}
+#ename {
+    background-color: #ffefbe;
+}
+#eurl {
+    background-color: #cdf2f6;
+}
+  </style>
+
+<body>
+
+<script type="text/javascript" src="jquery-3.3.1.js"></script>
+
+<script type="text/javascript" src="jslib/UTIL.js"></script>
+<script type="text/javascript" src="jslib/UTILDB.js"></script>
+<script type="text/javascript" src="jslib/UTILIO.js"></script>
+
+<script>
+
+function newEvent() { //TODO ask
+    document.getElementById('eid').value = "";
+    document.getElementById('ename').value = "";
+    document.getElementById('ememo').value = "";
+    document.getElementById('elen').value = 1;
+    document.getElementById('edate').value = document.getElementById('edate').value = new Date().toISOString().substr(0, 10);
+    document.getElementById('etag').value = "";
+    document.getElementById('eurl').value = "";
+    document.getElementById('etags').value = "";
+}
+function readEvent() {
+    var ename = document.getElementById('ename').value, 
+        ememo = document.getElementById('ememo').value, 
+        elen = document.getElementById('elen').value, 
+        etag = document.getElementById('etag').value, 
+        etags = document.getElementById('etags').value, 
+        eurl = document.getElementById('eurl').value, 
+        edate = document.getElementById('edate').value;//TODO check
+    if (edate) {
+        edate = new Date(edate).toISOString().substr(0, 10);
+    }
+    return {edate:edate, ename:ename, ememo:ememo, elen:elen, etag:etag, etags:etags, eurl:eurl};
+}
+function addEvent() {
+    addEventDB(db, readEvent());
+    showEvents(db, 2);
+}
+function saveEvent() {
+    var evt = readEvent();
+    evt.id = document.getElementById('eid').value;
+    
+    if (eid && confirm("Save changes for [" + evt.id + "] " + evt.ename) == true) {
+        saveEventDB(db, evt);
+        showEvents(db, 2);
+    }    
+}
+function delEvent() {
+    var eid = document.getElementById('eid').value, 
+        ename = document.getElementById('ename').value;
+    
+    if (confirm("Delete [" + eid + "] " + ename) == true) {
+        deleteEventDB(db, eid);
+        showEvents(db, 2);
+    }    
+}
+function showHtml(obj) {
+    //if (obj.id)
+    processById(db, obj.id, showHtmlObj);
+}
+function showHtmlObj(obj) {
+    var frame = document.getElementById("theFrame");
+          
+    var doc = document.implementation.createHTMLDocument("");
+    doc.body.innerHTML = obj.ememo;
+
+    var destDocument = frame.contentDocument;
+    var newNode = destDocument.importNode(doc.documentElement, true);
+
+    destDocument.replaceChild(newNode, destDocument.documentElement);
+    openTab({ currentTarget: document.getElementById("buttonView") }, "View");
+}
+function viewMemo() {
+    showHtmlObj ({ ememo: document.getElementById("ememo").value });
+}
+
+function editEvent(obj) {
+    //if (obj.id)
+    processById(db, obj.id, editEventObj);
+}
+function editEventObj(obj) {
+    //TODO check form changes
+    ///////////////obj.id 
+    var eid = document.getElementById('eid').value, 
+        ename = document.getElementById('ename').value;
+
+    if (eid || ename) {
+        if (confirm("Discard unsaved changes for [" + eid + "] " + ename) == false) {
+            return;
+        }
+    }
+    
+    //ename, ememo, id, elen, pdate, edate, dlen
+    document.getElementById('eid').value = obj["id"];
+    document.getElementById('ename').value = obj["ename"];
+    document.getElementById('ememo').value = obj["ememo"];
+    document.getElementById('elen').value = obj["elen"];
+    document.getElementById('etag').value = obj["etag"];
+    document.getElementById('etags').value = obj["etags"];
+    document.getElementById('eurl').value = obj["eurl"];
+    document.getElementById('edate').value = null;
+    try {
+        document.getElementById('edate').value = new Date(obj["edate"]).toISOString().substr(0, 10);
+    } catch (e) {}
+    openTab({ currentTarget: document.getElementById("buttonEdit") }, "Edit");
+
+}
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    if (evt) {
+        evt.currentTarget.className += " active";
+    }
+    window.scrollTo(0, 0);
+}
+function showStatus(m, o, exc) {
+    var now = new Date().toISOString().slice(0,19).replace("T", " ");
+    if (!o) {
+        o = m;
+    }
+    var msg = now + ": <pre>" + UTIL.escapeHTML(o) + "</pre>";
+    var msgSh = now + ": " + UTIL.escapeHTML(m);
+    var statDiv = document.getElementById('opstatus');
+    if (statDiv) {
+        statDiv.innerHTML = msgSh;
+    }
+    var errDiv = document.getElementById('errorDiv');
+    if (errDiv) {
+        errDiv.innerHTML = msg + "<p>" + errDiv.innerHTML;
+    }
+    if (exc) {
+        console.log(exc);
+    }
+}
+
+function searchFormReset() {
+    document.getElementById("searchForm").reset();
+    var zeroDate = new Date();
+    zeroDate.setTime(0);
+    var futureDate = new Date();
+    futureDate.setFullYear(futureDate.getFullYear()+100);
+    document.getElementById('fromdate').value = zeroDate.toISOString().substr(0, 10);
+    document.getElementById('todate').value = futureDate.toISOString().substr(0, 10);
+}
+function saveObj2FS(obj, filePrefix) {
+    var filenameUname = "-" + "events" + "-";
+    if (filePrefix === undefined ) {
+        filePrefix = "exportData";
+    }
+    UTILIO.saveAs(UTILIO.text2blob(UTIL.objDB2text(obj)), filePrefix+filenameUname+UTIL.date2text(new Date())+".json");
+}
+function exportFoundData() {
+    showEvents(db, null, saveObj2FS );
+}
+function exportData() {
+    showChangedEvents(db, null, saveObj2FS );
+}
+function importData(obj) {
+    console.log(obj);
+    //fillTable(obj);
+    if (confirm("Will import data from file? All data to be overwritten") == true) {
+        importTable(obj);
+    }
+}
+</script>
+
+<div class="controldiv">
+
+    <div id="opstatus">Ok</div>
+
+    <div class="tab">
+      <button class="tablinks" onclick="openTab(event, 'Find')" id="defaultOpen">Find</button>
+      <button class="tablinks" onclick="openTab(event, 'Edit')" id="buttonEdit">Edit</button>
+      <!--button class="tablinks" onclick="openTab(event, 'Import')">Import</button-->
+      <button class="tablinks" onclick="openTab(event, 'View')" id="buttonView">View</button>
+      <button class="tablinks" onclick="openTab(event, 'Errors')">Errors</button>
+    </div>
+</div>
+
+
+<div class="controlleddiv">
+
+
+    <div id="View" class="tabcontent">
+        <span onclick="this.parentElement.style.display='none'" class="topright">x</span>
+        <div class="tcontent">
+            <iframe id="theFrame" srcdoc="" width="100%"></iframe>
+        </div>
+    </div>
+
+    <div id="Edit" class="tabcontent">
+        <span onclick="this.parentElement.style.display='none'" class="topright">x</span>
+        <div class="tcontent">
+            <form id="editForm">
+            <div id="drop_zone">Drop files here</div>
+            <table border=0 style="width:100%">
+            <tr><td>
+            <input type="text" readonly="true" id="eidprefix" name="eidprefix"/>
+            </td></tr><tr><td>
+            <input type="text" readonly="true" id="eid" name="eid"/>
+            <div class="inline">Date: <input type="date" id="edate" name="edate" /></div>
+            <div class="inline">Length: <input type="text" id="elen" name="elen" value="1" size="4" min="0"  maxlength="3" oninput="this.value=this.value.slice(0,this.maxLength||1/1);this.value=!isNaN(parseInt(this.value)) ? ((parseInt(this.value) < parseInt(this.min))? (parseInt(this.min)) : parseInt(this.value)) : (this.value == '-') ? '-' : ''"/></div>
+            <div class="inline">Tag:    <input type="text" id="etag" name="etag"           size="4" min="-1" maxlength="3" oninput="this.value=this.value.slice(0,this.maxLength||1/1);this.value=!isNaN(parseInt(this.value)) ? ((parseInt(this.value) < parseInt(this.min))? (parseInt(this.min)) : parseInt(this.value)) : (this.value == '-') ? '-' : ''"/></div>
+            <div>Name:</div><input type="search" id="ename" name="ename" style="width:100%"/>
+            <div>Tags:</div><input type="search" id="etags" name="etags" style="width:100%"/>
+            <div>URL:</div><input type="search" id="eurl" name="eurl" style="width:100%"/>
+            </td></tr><tr><td><div class="inline-no">Memo: <textarea rows="5" type="text" id="ememo" name="ememo" style="width:100%" ></textarea></div>
+            </td></tr><tr><td>
+            <input type="button" onclick="delEvent()" value="Del"/>
+            <input type="button" onclick="newEvent()" value="New"/>
+            <input type="button" onclick="addEvent()" value="Add"/>
+            <input type="button" onclick="saveEvent()" value="Save"/>
+            <input type="button" onclick="viewMemo()" value="View memo"/>
+            </td></tr>
+            </table>
+
+            </form>
+        </div>
+    </div>
+
+    <div id="Import" class="tabcontent">
+        <span onclick="this.parentElement.style.display='none'" class="topright">x</span>
+        <div class="tcontent">
+            <input type="button" onclick="exportFoundData()" value="Save found"/>
+            <input type="button" onclick="exportData()" value="Export changed"/>
+            <input type="button" onclick="syncDone(db)" value="Sync done"/>
+            <form id="exportForm">
+            <table style="width:100%"><tr>
+            <td>
+            <button type="reset" value="Reset" class="Reset">Reset</button>
+            Import: <input type="file" id="files1" name="files1[]" />
+            </td>
+            </tr>
+            </table>
+            </form>
+        </div>
+    </div>
+
+    <div id="Find" class="tabcontent">
+        <span onclick="this.parentElement.style.display='none'" class="topright">x</span>
+        <div class="tcontent">
+            <form id="searchForm" onsubmit="showEvents(db, 2); return false;">
+            <table border=0 style="width:100%"><tr>
+            <td>
+            <input type="submit" value="Search">
+            <input type="button" onclick="showTags(db)" value="Tags"/>
+            <!--input type="button" onclick="UTILDB.showTable(db, 'events')" value="Log"/-->
+            <input type="button" onclick="searchFormReset()" value="Reset"/>
+            <input type="button" onclick="showEvents(db, -2)" value="Delete selected"/>
+            </td></tr><tr><td>
+            <div class="inline">From date: <input type="date" id="fromdate" name="fromdate" /></div>
+            <div class="inline">To date: <input type="date" id="todate" name="todate" /></div>
+            <div></div><input placeholder="Search column name" type="text" id="fsename" name="fsename" style="width:100%" value="ename"/>
+            <div>Name:</div><input type="search" id="fename" name="fename" style="width:100%" value=""/> <!--test%-->
+            <div class="inline">Tag: <input type="text" id="fetag" name="fetag" type="number" size="4" min="-1" maxlength="3" oninput="this.value=this.value.slice(0,this.maxLength||1/1);this.value=!isNaN(parseInt(this.value)) ? ((parseInt(this.value) < parseInt(this.min))? (parseInt(this.min)) : parseInt(this.value)) : (this.value == '-') ? '-' : ''"/></div>
+            </td></tr><tr><td>
+            <input type="button" onclick="document.getElementById('eoffset').value = 0; showEvents(db, 2);" value="Begin>"/>
+            <input type="button" onclick="if(parseInt(document.getElementById('eoffset').value) >= parseInt(document.getElementById('elimit').value)) { document.getElementById('eoffset').value= parseInt(document.getElementById('eoffset').value) - parseInt(document.getElementById('elimit').value);showEvents(db, 2);}" value="&lt;Prev"/>
+
+            <input type="button" onclick="document.getElementById('eoffset').value = parseInt(document.getElementById('eoffset').value) + parseInt(document.getElementById('elimit').value) ;showEvents(db, 2);" value="Next>"/>
+            <input type="button" onclick="document.getElementById('eoffset').value = LAST_OFFSET; showEvents(db, 2);" value="Last offset>"/>
+            <div id="countDiv" class="inline" style="padding-left:5px;"></div>
+            </td></tr><tr><td>
+            <div class="inline">Limit: <input type="text" id="elimit" name="elimit" value="30" size="4" min="5" maxlength="3" onchange="document.getElementById('eoffset').step=this.value;" oninput="this.value=this.value.slice(0,this.maxLength||1/1);this.value=(this.value   < 0) ? (Math.abs(this.value)) : isNaN(parseInt(this.value)) ? this.min : parseInt(this.value)"/></div>
+            <div class="inline">Offset: <input id="eoffset" name="eoffset" value="0" step="30" type="number" min="0" maxlength="40" oninput="this.value=this.value.slice(0,this.maxLength||1/1);this.value=(this.value   < 0) ? (Math.abs(this.value)) : isNaN(parseInt(this.value)) ? this.min : parseInt(this.value)"/></div>
+            </td></tr><tr><td>
+            <input type="checkbox" id="showAsHTML"/>As Html
+            </td></tr>
+            </table>
+            </form>
+        </div>
+    </div>
+
+    <div id="Errors" class="tabcontent">
+        <span onclick="this.parentElement.style.display='none'" class="topright">x</span>
+        <span onclick="document.getElementById('errorDiv').innerHTML='<p>'" class="topright">&empty;&nbsp;</span>
+        <div class="tcontent">
+        <div id="errorDiv">Ok</div>
+        </div>
+    </div>
+    
+<table id="eventListTable" width="100%" style="margin-top: .5em;" >
+</table>
+
+</div>
+
+<script>
+
+["ename", "etags", "eurl", "ememo"].forEach(function(e){
+    var el = document.getElementById(e);
+    el.addEventListener('drop', function(evt){
+        var files = evt.dataTransfer.files;
+        if (files.length > 0) {
+            evt.stopPropagation();
+            evt.preventDefault();
+            if (evt.target.value && evt.target.value.length > 0) {
+                evt.target.value += (" " + files[0].name);
+            } else {
+                evt.target.value = files[0].name;
+            }
+        } else {
+            //evt.target.value = evt.dataTransfer.getData("Text");
+        }
+    });
+});
+
+
+function etags2(str) {
+    if (str) {
+        var eventTagsArr = str.split(" ");
+        eventTagsArr = eventTagsArr.sort();
+        return eventTagsArr.join(" ").trim();
+    }
+    return str;
+}
+
+var dropZone = document.getElementById('drop_zone');
+dropZone.addEventListener('dragover', function(evt) {evt.stopPropagation();evt.preventDefault();evt.dataTransfer.dropEffect = 'copy';}, false);
+dropZone.addEventListener('drop', function(evt){
+    UTILIO.handleURLDnD(evt, function(arr) {
+        var eventTags = document.getElementById('etags').value;
+        var now = UTIL.parseDate(new Date().toString());
+        var events = [];
+        for (var i = 0; i < arr.length; i++) {
+            if ("content" in arr[i] && "url" in arr[i].content && arr[i].content.url) {
+                var evtDate = now;
+                if ("file" in arr[i] && arr[i].file) {
+                    evtDate = UTIL.parseDate(arr[i].file.lastModifiedDate.toString());
+                }
+                var evt = {
+                    etag: '',
+                    edate: evtDate, 
+                    ename: UTILIO.getFileTitle(arr[i].content.title, [".url", ".website"]),
+                    ememo: UTIL.toEmpty(arr[i].content.comment),
+                    elen: 1,
+                    etags: eventTags, 
+                    eurl: arr[i].content.url
+                    };
+                    //addEventDB(db, evt
+                events.push(evt);
+            }
+        }
+        if (events.length > 0 && confirm("Will be imported " + events.length + " events with tags: " + eventTags) == false) {
+            return;
+        }
+
+        //alert(JSON.stringify(events));
+
+        var ctx = { done:true, i:0 }, errLines = [];
+        var intervalPointer=setInterval(function () {
+            if (ctx.i < events.length) {
+                if (ctx.done) {
+                    var rowIt = rowItem(events, ctx.i);
+                    ctx.done = false;
+                    addEventDB(db, rowIt, errLines, function() {
+                        ctx.i = ctx.i + 1;
+                        ctx.done = true;
+                    });
+                }
+            }
+            if (ctx.done) {
+                clearInterval(intervalPointer);
+                
+                if (errLines && errLines.length > 0) {
+                    saveObj2FS(UTIL.toObject(errLines), "importError");
+                }
+                showEvents(db, 2);
+            }
+        }, 100);
+
+    });
+}, false);
+
+newEvent();
+searchFormReset();
+document.getElementById('files1').addEventListener('change', 
+    function(evt) {
+        new UTILIO.FileOpenerText(function(text){
+            try {
+                var cfg = JSON.parse(text);
+                importData(cfg);
+            } catch (e) {
+                console.log("parse json error", e);
+                showStatus("parse json error");
+            }
+        }).handleFileSelect(evt);
+    }, false);
+
+    var __idprefix = null;
+    var db = fopenDatabase('sevnUrlEvents', '1.0', 'Events db', 20 * 1024 * 1024);
+//UTILDB.dropTables(db, ["events", "idprefix"]);
+//UTILDB.dropTables(db, ["events"]);
+//UTILDB.dropViews(db, ["v_events"]);    
+    db.transaction(
+    //SELECT ROWID, * FROM events ORDER BY edate DESC, ename ASC
+        function(transaction) {
+            transaction.executeSql(
+                'CREATE TABLE IF NOT EXISTS events ' +
+                '  (id TEXT NOT NULL PRIMARY KEY, ' +
+                '   edate DATE NOT NULL,'  +
+                '   elen INTEGER NOT NULL,'  +
+                '   ename TEXT NOT NULL,' +
+                '   etag INTEGER,' +
+    // 0 deleted
+    // 1 new
+    // 2 changed
+    // 3 synced
+                '   stat INTEGER DEFAULT 1, ' +
+                '   stattime TIMESTAMP DEFAULT current_timestamp, ' +
+                '   etags TEXT, ' +
+                '   eurl TEXT, ' +
+                '   ememo TEXT);'
+            );
+            transaction.executeSql(
+                'CREATE TABLE IF NOT EXISTS idprefix ' +
+                '  (id INTEGER NOT NULL PRIMARY KEY, ' +
+                '   name TEXT);'
+            );
+        }
+    );
+    /*
+    db.transaction(
+        function(transaction) {
+            transaction.executeSql(
+                'ALTER TABLE events ' +
+                '  ADD COLUMN ' +
+                '    etag INTEGER'
+            );
+        }
+    );    
+    db.transaction(
+        function(transaction) {
+            transaction.executeSql(
+                'ALTER TABLE events ' +
+                '  ADD COLUMN ' +
+                '    stat INTEGER DEFAULT 1 '
+            );
+        }
+    );    
+    db.transaction(
+        function(transaction) {
+            transaction.executeSql(
+                'ALTER TABLE events ' +
+                '  ADD COLUMN ' +
+                '    stattime TIMESTAMP DEFAULT current_timestamp '
+            );
+        }
+    );
+*/    
+    getPrefix(db);
+    //alter table t1 add column status varchar default 'N';
+    //create table tbl1(id int primary key, dt datetime default current_timestamp); CURRENT_TIME, CURRENT_DATE 
+function addEventDB(db, evt /*edate, ename, ememo, elen*/, errors, callback) {
+    var id = __idprefix + "-" + UTIL.generateGuid();
+    db.transaction(function (tx) {
+        tx.executeSql('INSERT INTO events (id, edate, ename, ememo, elen, etag, etags, eurl) VALUES (?,?,?,?,?, ?,?,?)', 
+            [id, evt.edate, evt.ename, evt.ememo, evt.elen, evt.etag, etags2(evt.etags), evt.eurl], 
+            function(transaction, results){ 
+                showStatus("Inserted: " + results.rowsAffected + " rows,  id=" + results.insertId);
+                //console.log(results); 
+                if (callback) callback()
+            }, 
+            function(err) { 
+                showStatus("Error");
+                if (errors) errors.push(evt);
+                if (callback) callback()
+                //console.log(err);
+            }
+        );
+    });
+}
+function replaceEventDB(db, evt, errLines, callback) {
+    db.transaction(function (tx) {
+        tx.executeSql('INSERT INTO events (id, edate, ename, ememo, elen, etag, etags, eurl) VALUES (?,?,?,?,?,?,?,?)', 
+            [evt.id, evt.edate, evt.ename, evt.ememo, evt.elen, evt.etag, etags2(evt.etags), evt.eurl], 
+            function(transaction, results){ 
+                showStatus("Inserted or updated: " + results.rowsAffected + " rows,  id=" + results.insertId);
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                console.log(err);
+                replaceEventDBreplace(db, evt, errLines, callback);
+            }
+        );
+    });
+}
+function replaceEventDBreplace(db, evt, errLines, callback) {
+     db.transaction(function (tx) {
+        tx.executeSql("UPDATE events SET edate = ?, ename = ?, ememo = ?, elen = ?, etag = ?, etags = ?, eurl = ?, stat = 3, stattime=(datetime('now')) WHERE id = ? AND stattime < ?", 
+            [ evt.edate, evt.ename, evt.ememo, evt.elen, evt.etag, etags2(evt.etags), evt.eurl, evt.id, evt.stattime], 
+            function(transaction, results){ 
+                showStatus("Updated: " + results.rowsAffected);
+                if (results.rowsAffected < 1) {
+                    if (errLines) {
+                        errLines.push({edate:evt.edate, ename:evt.ename, ememo:evt.ememo, elen:evt.elen, etag:evt.etag, etags:evt.etags, eurl:evt.eurl, id: evt.id, stat:evt.stat, stattime:evt.stattime});
+                    }
+                }
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                if (errLines) {
+                    errLines.push({edate:evt.edate, ename:evt.ename, ememo:evt.ememo, elen:evt.elen, etag:evt.etag, etags:evt.etags, eurl:evt.eurl, id: evt.id, stat:evt.stat, stattime:evt.stattime});
+                }
+                //console.log(err);
+                if (callback) callback();
+            }
+        );
+     });
+}    
+function saveEventDB(db, evt /*id, edate, ename, ememo, elen*/, errLines, callback) {
+     db.transaction(function (tx) {
+        tx.executeSql("UPDATE events SET edate = ?, ename = ?, ememo = ?, elen = ?, etag = ?, etags = ?, eurl = ?, stat = 2, stattime=(datetime('now')) WHERE id = ? ", 
+            [ evt.edate, evt.ename, evt.ememo, evt.elen, evt.etag, etags2(evt.etags), evt.eurl, evt.id], 
+            function(transaction, results){ 
+                showStatus("Updated: " + results.rowsAffected);
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                if (errLines) {
+                    errLines.push({id: evt.id, edate: evt.edate, ename: evt.ename, ememo: evt.ememo, elen: evt.elen, errLines: evt.errLines, etag:evt.etag});
+                }
+                //console.log(err);
+                if (callback) callback();
+            }
+        );
+     });
+}    
+function saveEventDBTag(db, evt /*id, edate, ename, ememo, elen*/, errLines, callback) {
+     db.transaction(function (tx) {
+        tx.executeSql("UPDATE events SET etag = ?, stat = 2, stattime=(datetime('now')) WHERE id = ? ", [ evt.etag, evt.id], 
+            function(transaction, results){ 
+                showStatus("Updated: " + results.rowsAffected);
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                if (errLines) {
+                    errLines.push({id: evt.id, etag:evt.etag});
+                }
+                //console.log(err);
+                if (callback) callback();
+            }
+        );
+     });
+}    
+
+function syncDone(db, callback) {
+    deleteEventDBStat0(db, function(){
+        saveEventDBStat(db, callback);
+    });
+}
+
+function saveEventDBStat(db, callback) {
+     db.transaction(function (tx) {
+        tx.executeSql("UPDATE events SET stat = 3, stattime=(datetime('now')) WHERE stat in (1, 2) ", [ ], 
+            function(transaction, results){ 
+                showStatus("Updated: " + results.rowsAffected);
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                //console.log(err);
+                if (callback) callback();
+            }
+        );
+     });
+}    
+
+function deleteEventDBStat0(db, callback) {
+     db.transaction(function (tx) {
+        tx.executeSql('DELETE FROM events WHERE stat = 0 ', [], 
+            function(transaction, results){ 
+                showStatus("Deleted: " + results.rowsAffected);
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                //console.log(err);
+                if (callback) callback();
+            }
+        );
+     });
+}
+function deleteEventDB(db, id) {
+     db.transaction(function (tx) {
+        tx.executeSql("UPDATE events SET stat = 0, stattime=(datetime('now')) WHERE id = ? ", [ id], 
+            function(transaction, results){ 
+                showStatus("Updated: " + results.rowsAffected);
+                //console.log(results); 
+                if (callback) callback();
+            }, 
+            function(err) { 
+                showStatus("Error");
+                if (errLines) {
+                    errLines.push({id: id});
+                }
+                //console.log(err);
+                if (callback) callback();
+            }
+        );
+     });
+        /*
+     db.transaction(function (tx) {
+        tx.executeSql('DELETE FROM events WHERE id = ? ', [id], 
+            function(transaction, results){ 
+                showStatus("Deleted: " + results.rowsAffected);
+                //console.log(results); 
+            }, 
+            function(err) { 
+                showStatus("Error");
+                //console.log(err);
+            }
+        );
+     });
+     */
+}
+
+function importTable(results_rows) {
+    var ctx = { done:true, i:0 }, errLines = [];
+    var intervalPointer=setInterval(function () {
+        if (ctx.i < results_rows.length) {
+            if (ctx.done) {
+                var rowIt = rowItem(results_rows, ctx.i);
+                ctx.done = false;
+                replaceEventDB(db, rowIt, errLines, function() {
+                    ctx.i = ctx.i + 1;
+                    ctx.done = true;
+                });
+            }
+        }
+        if (ctx.done) {
+            clearInterval(intervalPointer);
+            
+            if (errLines && errLines.length > 0) {
+                saveObj2FS(UTIL.toObject(errLines), "importError");
+            }
+        }
+    }, 100);
+}
+function fillTable(results_rows) {
+    var len = results_rows.length,
+        offset = parseInt(document.getElementById('eoffset').value),
+        showAsHTML = document.getElementById('showAsHTML').checked;
+    if(isNaN(offset)) offset = 0;
+                
+    var table = document.getElementById("eventListTable");
+    while(table.rows.length > 0) {
+        table.deleteRow(0);
+    }
+
+    //ename, ememo, id, elen, pdate, edate, dlen
+    var columnNames = {id: "", etag:"", edate: "", dlen: "", ename: "", elen: "", ememo: "", eurl: "", etags: ""};
+    var trow = 0;
+    var row;
+    for (var i = 0; i < len; i++) {
+        row = table.insertRow(trow++);
+        if (i == 0) {
+            row.classList.add("rowbg");
+
+            var j = 0;
+            
+            var cellNum = row.insertCell(j);
+            j++;
+            var element = document.createTextNode("N");
+            cellNum.appendChild(element);
+            cellNum.style.width = "25px";
+            cellNum.style.minWidth = "25px";
+            
+            for (var p in columnNames) {
+                if (p == "id") {
+                } else {
+                    var cell = row.insertCell(j);
+                    j++;
+                    var element = document.createElement("div");
+                    cell.appendChild(element);
+                    element.innerHTML = UTIL.escapeHTML(p);
+                }
+                if (isWideColumn(p)) {} else {
+                    cell.style.width = "1%";
+                }
+            }
+            row = table.insertRow(trow++);
+        }
+        row.classList.add("rowbgl");
+        
+        var j = 0;
+        
+        var cellNum = row.insertCell(j);
+        j++;
+        var element = document.createTextNode("" + (offset+i+1));
+        cellNum.appendChild(element);
+        cellNum.style.width = "25px";
+        cellNum.style.minWidth = "25px";
+        
+        var rowIt = rowItem(results_rows,i);
+        for (var p in columnNames) {
+            if (p == "id") {
+                var obj = {};
+                obj.id = rowIt.id;
+                cellNum.setAttribute("onclick", "editEvent("+JSON.stringify(obj)+")");
+            } else {
+                var cell = row.insertCell(j);
+                j++;
+                var element = document.createElement("div");
+                var cellVal = rowIt[p];
+                if (p == "ememo") {
+                    if (showAsHTML) {
+                        element = document.createElement("iframe");
+                        element.srcdoc = cellVal;
+                        element.setAttribute("onload", "setFrameSize(this)");
+                    } else {
+                        element.innerHTML = UTIL.escapeHTML(UTIL.shortStr(cellVal, 20, "..."));
+                    }
+                } else if (p == "etag") {
+                    var chbox  = document.createElement("input");
+                    chbox.type = "checkbox";
+                    var cellValInt = parseInt(cellVal);
+                    if (isNaN(cellValInt)) {} else {
+                        if (cellValInt == -1) {
+                            chbox.checked = true;
+                        }
+                    }
+                    (function(id){
+                        chbox.onchange = function(e) {
+                            if (e.target.checked) {
+                                saveEventDBTag(db, {id: id, etag: -1});
+                            } else {
+                                saveEventDBTag(db, {id: id, etag: ''});
+                            }
+                        };
+                    })(rowIt.id);
+                    var elementLabel = document.createTextNode(UTIL.escapeHTML(cellVal));
+                    element.appendChild(chbox);
+                    element.appendChild(elementLabel);
+                } else if (p == "eurl") {
+                    var orig = element;
+                    orig.innerHTML = UTIL.escapeHTML(UTIL.shortStr(cellVal, 20, "..."));
+                    //if (showAsHTML) {
+                        element = document.createElement("a");
+                        element.href = cellVal;
+                        element.title = cellVal;
+                        element.appendChild(orig);
+                    //}
+                } else {
+                    element.innerHTML = UTIL.escapeHTML(cellVal);
+                }
+                cell.appendChild(element);
+            }
+            if (isWideColumn(p)) {} else {
+                cell.style.width = "1%";
+            }
+            if (p == "ememo") {
+                var obj = {};
+                obj.id = rowIt.id;
+                cell.setAttribute("onclick", "showHtml("+JSON.stringify(obj)+")");
+            }
+            if (p == "etags") {
+                var obj = { value: cellVal, columnParamName: "etags"};
+                cell.setAttribute("onclick", "showTag("+JSON.stringify(obj)+")");                
+            }
+        }
+
+        //console.log(i, results_rows.item(i));
+    }
+}
+function isWideColumn(p) {
+    return (p == "ename" || p == "ememo" || p == "id" || p == "edate" || p == "etag" || p == "etags" || p == "eurl");
+}
+function setFrameSize(frame) {
+    frame.style.height=frame.contentDocument.body.scrollHeight +'px';
+    frame.style.border = "0px";
+    frame.contentDocument.body.style.padding = "0px";
+    frame.contentDocument.body.style.margin = "0px";
+
+}
+
+function rowItem (results_rows, i) {
+    if ( "item" in results_rows ) {
+        return results_rows.item(i);
+    } else {
+        return results_rows[i];
+    }
+}
+
+function processById(db, id, callback) {
+    //ename, ememo, id, elen, edate
+    var sql = "SELECT * FROM events WHERE id = ?";
+    if (callback) db.transaction(function (tx) {
+        tx.executeSql(sql, [id], 
+            function (tx, results) {
+                var len = results.rows.length;
+                var obj = { id: "", ename: "", ememo: "", elen: "", edate: "", etag: "", etags: "", eurl: ""};
+                if (len > 0) {
+                    var rowIt = rowItem(results.rows,0);
+                    obj.id = rowIt.id;
+                    obj.ename = rowIt.ename;
+                    obj.ememo = rowIt.ememo;
+                    obj.elen = rowIt.elen;
+                    obj.edate = rowIt.edate;
+                    obj.etag = rowIt.etag;
+                    obj.etags = rowIt.etags;
+                    obj.eurl = rowIt.eurl;
+                }
+                callback(obj);
+            },
+            function(err) { 
+                //console.log(err);
+                showStatus("Error");
+            }
+        );    
+    });
+}
+
+var LAST_OFFSET = 0;
+function showEvents(db, isCount, callback) {
+    if (isCount && isCount < 0) {
+        if (confirm("Will delete selected data?") != true) {
+            return;
+        }
+    }
+    fillTable({length: 0});
+    db.transaction(function (tx) {
+        //date(l/1000,'unixepoch','localtime') //sqlite ms to date
+        var date = new Date().toISOString().substr(0, 10); //TODO UTC
+
+        var limit = parseInt(document.getElementById('elimit').value), 
+            offset = parseInt(document.getElementById('eoffset').value),
+            columnParamName = document.getElementById('fsename').value, //TODO
+            fename = document.getElementById('fename').value,
+            fetag = document.getElementById('fetag').value,
+            date1 = new Date(document.getElementById('fromdate').value).toISOString().substr(0, 10),
+            date2 = new Date(document.getElementById('todate').value).toISOString().substr(0, 10);
+            
+        if (isNaN(limit) || limit <= 0) {
+            limit = 1;
+        }
+        if (isNaN(offset) || offset < 0) {
+            offset = 0;
+        }
+        //date(l/1000,'unixepoch','localtime')
+        //dlen is wrong if from date more then prev event date
+        var sqlparam = [date, date, date1, date, date2, date, date1, date2,
+            date1, date2, date1, date2, limit, offset];
+        var sqlparamCount = [date, date, date1, date, date2, date, date1, date2,
+            date1, date2, date1, date2];
+        var sqlBasic = 
+"WITH jt1 AS " + "\n" +
+"(SELECT etag, ename, ememo, etags, eurl, id, elen, l AS pdate, r AS edate, CAST ((julianday(r)-julianday(l)) AS INTEGER) AS dlen FROM ( " + "\n" +
+" SELECT etag, ename, ememo, etags, eurl, id, elen, l, min(r) AS r FROM ( " + "\n" +
+//FAKE
+" SELECT '' AS etag, ename, edate AS l, ? AS r , 'FAKE' AS ememo, '' as etags, '' as eurl, '' as id, '' AS elen FROM events " +  "\n" +
+" WHERE stat != 0 AND coalesce(eurl, '') = '' and " +  "\n" +
+" ? >= ? AND ? <= ? AND edate < ? AND edate >= ? AND edate <= ? "+  "\n" +
+" UNION ALL " +  "\n" + //FAKE
+" SELECT t2.etag, t1.ename, t1.edate AS l, t2.edate AS r, t2.ememo, t2.etags, t2.eurl, t2.id, t2.elen "+ "\n" +
+"  FROM events t1 "+ "\n" +
+"  JOIN events t2 "+ "\n" +
+"    ON (t1.ename = t2.ename) "+ "\n" +
+" WHERE t1.stat != 0 AND t2.stat != 0 AND t1.edate < t2.edate AND t1.edate >= ? AND t2.edate <= ? "+ "\n" +
+" ) GROUP BY ename, l "+ "\n" +
+" )) " + "\n" +
+" SELECT * FROM jt1 " + "\n" +
+" UNION ALL " + "\n" +
+" SELECT etag, ename, ememo, etags, eurl, id, elen, '' AS pdate, edate, 0 AS dlen FROM events " + "\n" +
+" WHERE stat != 0 AND id NOT IN (SELECT id FROM jt1) AND edate BETWEEN ? AND ? " + "\n" +
+" ORDER BY edate DESC, ename ASC "+  "\n";
+        if (!columnParamName) {
+            columnParamName = "ename";
+        }
+        if (fename || fetag != "") {
+            if (!fename) {
+                fename = "%";
+            }
+                sqlparam = [date, fename, date, date1, date, date2, date, date1, date2,
+                    fename, date1, date2, date1, date2, fename, limit, offset];
+                sqlparamCount = [date, fename, date, date1, date, date2, date, date1, date2,
+                    fename, date1, date2, date1, date2, fename];
+                var fenameSql = " "+columnParamName+" LIKE ? ";
+                var fenameSql1 = " t2."+columnParamName+" LIKE ? ";
+sqlBasic = 
+"WITH jt1 AS " + "\n" +
+"(SELECT etag, ename, ememo, etags, eurl, id, elen, l AS pdate, r AS edate, CAST ((julianday(r)-julianday(l)) AS INTEGER) AS dlen FROM ( " + "\n" +
+" SELECT etag, ename, ememo, etags, eurl, id, elen, l, min(r) AS r FROM ( " +  "\n" +
+//FAKE
+" SELECT '' AS etag, ename, edate AS l, ? AS r , 'FAKE' AS ememo, '' as etags, '' as eurl, '' as id, '' AS elen FROM events " +  "\n" +
+" WHERE stat != 0 AND coalesce(eurl, '') = '' and " + fenameSql + "\n" +
+" AND " +  "\n" +
+" ? >= ? AND ? <= ? AND edate < ? AND edate >= ? AND edate <= ? "+  "\n" +
+" UNION ALL " +  "\n" +//FAKE
+" SELECT t2.etag, t1.ename, t1.edate AS l, t2.edate AS r, t2.ememo, t2.etags, t2.eurl, t2.id, t2.elen "+ "\n" +
+"  FROM events t1 "+ "\n" +
+"  JOIN events t2 "+ "\n" +
+"    ON (t1.ename = t2.ename) AND "+ fenameSql1 + "\n" +
+" WHERE t1.stat != 0 AND t2.stat != 0 AND t1.edate < t2.edate AND t1.edate >= ? AND t2.edate <= ? "+ "\n" +
+" ) GROUP BY ename, l "+ "\n" +
+" )) " + "\n" +
+" SELECT * FROM jt1 " + "\n" +
+" UNION ALL " + "\n" +
+" SELECT etag, ename, ememo, etags, eurl, id, elen, '' AS pdate, edate, 0 AS dlen FROM events " + "\n" +
+" WHERE stat != 0 AND id NOT IN (SELECT id FROM jt1) AND edate BETWEEN ? AND ? AND " + fenameSql + "\n" +
+" ORDER BY edate DESC, ename ASC "+  "\n";
+        }
+        var sql = sqlBasic + " LIMIT ? OFFSET ? ";
+        var sqlCount = "SELECT count(*) AS cnt FROM (" + sqlBasic + ")";
+        var sqlDelete = "UPDATE events SET stat = 0, stattime=(datetime('now')) WHERE id IN (SELECT DISTINCT id FROM (" + sqlBasic + "))";
+        if (fetag != "" && !isNaN(parseInt(fetag)) ) {
+            sql = "SELECT * FROM (" + sqlBasic + ") WHERE etag = ? LIMIT ? OFFSET ? ";
+            sqlDelete = "UPDATE events SET stat = 0, stattime=(datetime('now')) WHERE id IN (SELECT DISTINCT id FROM (" + sqlBasic + ") WHERE etag = ?)";
+            sqlCount = "SELECT count(*) as cnt FROM (" + sqlBasic + ") WHERE etag = ? ";
+            sqlparam = [date, fename, date, date1, date, date2, date, date1, date2,
+                fename, date1, date2, date1, date2, fename, parseInt(fetag), limit, offset];
+            sqlparamCount = [date, fename, date, date1, date, date2, date, date1, date2,
+                fename, date1, date2, date1, date2, fename, parseInt(fetag)];
+        }
+
+        if (isCount) {
+            if (isCount < 0) {
+                tx.executeSql(sqlDelete, sqlparamCount, 
+                    function (tx, results) {
+                        showStatus("Deleted: " + results.rowsAffected);
+                    },
+                    function(err) { 
+                        //console.log(err);
+                        showStatus("Error",sqlDelete);
+                    }
+                );
+            } else {
+                tx.executeSql(sqlCount, sqlparamCount, 
+                    function (tx, results) {
+                        var rowIt = rowItem(results.rows,0);
+                        var cnt = parseInt(rowIt["cnt"]);
+                        if (isNaN(cnt)) {
+                            cnt = 0;
+                        }
+                        LAST_OFFSET = cnt;
+                        LAST_OFFSET = Math.floor(LAST_OFFSET / limit) * limit;
+                        if (LAST_OFFSET == cnt && LAST_OFFSET > 0) {
+                            LAST_OFFSET = LAST_OFFSET - limit;
+                        }
+                        document.getElementById("countDiv").innerHTML = rowIt["cnt"];
+                    },
+                    function(err) { 
+                        //console.log(err);
+                        showStatus("Error",sqlCount);
+                    }
+                );
+            }
+        }
+        
+        if (!isCount || isCount && isCount == 2) {
+            tx.executeSql(sql, sqlparam, 
+                function (tx, results) {
+                    if (callback) {
+                        callback(results.rows);
+                    } else {
+                        fillTable(results.rows)
+                    }
+                },
+                function(err) { 
+                    //console.log(err);
+                    showStatus("Error", sql);
+                }
+            );
+        }
+    });
+}
+function showChangedEvents(db, isCount, callback) {
+    fillTable({length: 0});
+    db.transaction(function (tx) {
+        //date(l/1000,'unixepoch','localtime') //sqlite ms to date
+        var date = new Date().toISOString().substr(0, 10); //TODO UTC
+
+        var limit = parseInt(document.getElementById('elimit').value), 
+            offset = parseInt(document.getElementById('eoffset').value);
+        if (isNaN(limit) || limit <= 0) {
+            limit = 1;
+        }
+        if (isNaN(offset) || offset < 0) {
+            offset = 0;
+        }
+        var sqlparam = [limit, offset];
+        var sqlparamCount = [];
+            
+        var sqlBasic = "select * from events where stat in (0, 1, 2) order by stat, edate "
+        
+        var sql = sqlBasic + " LIMIT ? OFFSET ? ";
+        
+        var sqlCount = "SELECT count(*) AS cnt FROM (" + sqlBasic + ")";
+
+        if (isCount) {
+            if (isCount > 0) {
+                tx.executeSql(sqlCount, sqlparamCount, 
+                    function (tx, results) {
+                        var rowIt = rowItem(results.rows,0);
+                        var cnt = parseInt(rowIt["cnt"]);
+                        if (isNaN(cnt)) {
+                            cnt = 0;
+                        }
+                        LAST_OFFSET = cnt;
+                        LAST_OFFSET = Math.floor(LAST_OFFSET / limit) * limit;
+                        if (LAST_OFFSET == cnt && LAST_OFFSET > 0) {
+                            LAST_OFFSET = LAST_OFFSET - limit;
+                        }
+                        document.getElementById("countDiv").innerHTML = rowIt["cnt"];
+                    },
+                    function(err) { 
+                        //console.log(err);
+                        showStatus("Error",sqlCount);
+                    }
+                );
+            }
+        }
+        
+        if (!isCount || isCount && isCount == 2) {
+            tx.executeSql(sql, sqlparam, 
+                function (tx, results) {
+                    if (callback) {
+                        callback(results.rows);
+                    } else {
+                        fillTable(results.rows)
+                    }
+                },
+                function(err) { 
+                    //console.log(err);
+                    showStatus("Error", sql);
+                }
+            );
+        }
+    });
+}
+function getPrefix(db) {
+    db.transaction(function (tx) {
+        tx.executeSql('SELECT name FROM idprefix WHERE id = 1', [], 
+            function (tx, results) {
+                var len = results.rows.length;
+                if (len > 0) {
+                    for (var i = 0; i < len; i++) {
+                        __idprefix = rowItem(results.rows, i)["name"];
+                    }
+                } else {
+                    
+                    while (__idprefix == null || __idprefix == "") {
+                        __idprefix = prompt("Please enter device id", UTIL.generateGuid());
+                    }
+                    
+                    tx.executeSql('INSERT INTO idprefix (id, name) VALUES (?,?)', [1, __idprefix], 
+                        function(transaction, results){ 
+                            //showStatus("Inserted: " + results.rowsAffected + " rows,  id=" + results.insertId);
+                            console.log(results); 
+                        }, 
+                        function(err) { 
+                            //showStatus("Error");
+                            console.log(err);
+                        }
+                    );                
+                }
+                document.getElementById('eidprefix').value = __idprefix;
+            },
+            function(err) { 
+                console.log(err);
+            }
+        );
+    });
+}    
+    function showTags(db) {
+        db.transaction(function (tx) {
+            tx.executeSql('SELECT DISTINCT etags FROM events ORDER BY etags', [], 
+                function (tx, results) {
+                    var len = results.rows.length;
+                    var msg = "<p>Found rows: " + len + "</p>";
+                    console.log(msg);
+                    fillSimpleTable(results.rows);
+            
+                    for (var i = 0; i < len; i++) {
+                        console.log(i, rowItem(results.rows, i));
+                    }
+                },
+                function(err) { 
+                    console.log(err);
+                }
+            );
+        });
+    };
+    function fillSimpleTable(results_rows) {
+        var len = results_rows.length;
+                    
+        var table = document.getElementById("eventListTable");
+        while(table.rows.length > 0) {
+            table.deleteRow(0);
+        }
+
+        var columnNames = {etags: ""};
+        var trow = 0;
+        var row;
+        for (var i = 0; i < len; i++) {
+            row = table.insertRow(trow++);
+            if (i == 0) {
+                row.classList.add("rowbg");
+
+                var j = 0;
+                
+                var cellNum = row.insertCell(j);
+                j++;
+                var element = document.createTextNode("N");
+                cellNum.appendChild(element);
+                cellNum.style.width = "25px";
+                cellNum.style.minWidth = "25px";
+                
+                for (var p in columnNames) {
+                    if (p == "id") {
+                    } else {
+                        var cell = row.insertCell(j);
+                        j++;
+                        var element = document.createElement("div");
+                        cell.appendChild(element);
+                        element.innerHTML = UTIL.escapeHTML(p);
+                    }
+                }
+                row = table.insertRow(trow++);
+            }
+            row.classList.add("rowbgl");
+            
+            var j = 0;
+            
+            var cellNum = row.insertCell(j);
+            j++;
+            var element = document.createTextNode("" + (i+1));
+            cellNum.appendChild(element);
+            cellNum.style.width = "25px";
+            cellNum.style.minWidth = "25px";
+            
+            var rowIt = rowItem(results_rows,i);
+            for (var p in columnNames) {
+                var cell = row.insertCell(j);
+                j++;
+                var element = document.createElement("div");
+                var cellVal = rowIt[p];
+                element.innerHTML = UTIL.escapeHTML(cellVal);
+                cell.appendChild(element);
+                
+                var obj = { value: cellVal, columnParamName: "etags"};
+                cellNum.setAttribute("onclick", "showTag("+JSON.stringify(obj)+")");                
+            }
+        }
+    }
+    
+    function showTag(obj) {
+        document.getElementById('fsename').value = obj.columnParamName;
+        document.getElementById('fename').value = obj.value;
+        showEvents(db, 2);
+        newEvent();
+        document.getElementById('etags').value = obj.value;
+    }
+
+function sendData(tx, url, data, onOk, onErr) {
+    $.ajax({
+        //headers: {"Accept": "application/json","Content-Type": "application/json"},
+        headers: {"Accept": "application/json" }, 
+        crossDomain: true,
+        url: url,
+        dataType: 'json',
+        contenType: "application/json",
+        type: "POST",
+        data: JSON.stringify(data),
+        success: function(data, textStatus, req) {
+            if (onOk) {
+                if ("data" in data) {
+                    onOk(tx, data.data);
+                } else if ("errors" in data) {
+                    if (onErr) {
+                        onErr(data.errors);
+                    }
+                } else {
+                    if (onErr) {
+                        onErr("unsupported responce format");
+                    }
+                }
+            }
+        },
+        error: function(req, textStatus, err) {
+            if (onErr) {
+                onErr(err);
+            }
+        }
+    });
+}
+function fopenDatabase(dbName, version, comment, size) {
+  return new fDatabase(dbName, version, comment, size);
+}
+function fDatabase(dbName, version, comment, size) {
+  this.dbName = dbName;
+  this.version = version;
+  this.comment = comment;
+  this.size = size;
+  this.transaction = function (fn) {
+    fn(new dbTransaction());
+  };
+}
+function dbTransaction() {
+  this.executeSql = function (sql, args, fnOk, fnErr) {
+    sendData(this, "/vxnotes", {sql: sql, args : args}, fnOk, fnErr);
+  };
+}
+
+showEvents(db, 2);
+</script>
+</body>
+</html>

@@ -1,4 +1,6 @@
+db/
 target/
+.vertx/
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
