@@ -112,6 +112,26 @@ WITH jt1 AS
 " WHERE stat != 0 AND id NOT IN (SELECT id FROM jt1) AND edate BETWEEN ? AND ? \n" +
 " ORDER BY edate DESC, ename ASC \n" +
 " LIMIT ? OFFSET ? ";
+    final static String LINES1 = "WITH jt1 AS \n" +//CAST ((julianday(r)-julianday(l)) AS INTEGER) AS dlen
+"(SELECT etag, ename, ememo, etags, eurl, id, elen, l AS pdate, r AS edate, (r-l)/60/60/24/1000 AS dlen FROM ( \n" +
+" SELECT etag, ename, ememo, etags, eurl, id, elen, l, min(r) AS r FROM ( \n" +
+" SELECT '' AS etag, ename, edate AS l, ? AS r , 'FAKE' AS ememo, '' as etags, '' as eurl, '' as id, '' AS elen FROM events \n" +
+" WHERE stat != 0 AND coalesce(eurl, '') = '' and \n" +
+" ? >= ? AND ? <= ? AND edate < ? AND edate >= ? AND edate <= ? \n" +
+" UNION ALL \n" +
+" SELECT t2.etag, t1.ename, t1.edate AS l, t2.edate AS r, t2.ememo, t2.etags, t2.eurl, t2.id, t2.elen \n" +
+"  FROM events t1 \n" +
+"  JOIN events t2 \n" +
+"    ON (t1.ename = t2.ename) \n" +
+" WHERE t1.stat != 0 AND t2.stat != 0 AND t1.edate < t2.edate AND t1.edate >= ? AND t2.edate <= ? \n" +
+" ) GROUP BY ename, l \n" +
+" )) \n" +
+" SELECT * FROM jt1 \n" +
+" UNION ALL \n" +
+" SELECT etag, ename, ememo, etags, eurl, id, elen, '' AS pdate, edate, 0 AS dlen FROM events \n" +
+" WHERE stat != 0 AND id NOT IN (SELECT id FROM jt1) AND edate BETWEEN ? AND ? \n" +
+" ORDER BY edate DESC, ename ASC \n" +
+" LIMIT ? OFFSET ? ";
     /*
     INSERT INTO events (id, edate, ename, ememo, elen, etag, etags, eurl) VALUES (?,?,?,?,?, ?,?,?)
     */
@@ -213,6 +233,8 @@ WITH jt1 AS
 " WHERE stat != 0 AND id NOT IN (SELECT id FROM jt1) AND edate BETWEEN ? AND ? AND  etags LIKE ? \n" +
 " ORDER BY edate DESC, ename ASC \n" +
 " LIMIT ? OFFSET ? ";
+    
+    final static String INS = "INSERT INTO events (id, edate, ename, ememo, elen, etag, etags, eurl) VALUES (?,?,?,?,?,?,?,?)";
 
     private final SimpleSqliteObjectStore store;
     
@@ -274,6 +296,27 @@ WITH jt1 AS
                                 .put("title", "Can't add object")));
                     }
                 }
+                case INS:// "INSERT INTO events (id, edate, ename, ememo, elen, etag, etags, eurl) VALUES (?,?,?,?,?,?,?,?)";
+                {
+                    Events event = new Events();
+                    int i = 0;
+                    event.setId(args.getString(i++)).setEdate(args.getString(i++)).setEname(args.getString(i++)).setEmemo(args.getString(i++))
+                            .setElen(toInt(args.getInteger(i++)))
+                            .setEtag(Util.toInt(args.getString(i++)))
+                            .setEurl(args.getString(i++));
+                    final int changed = store.addObject(event);
+                    if (changed > 0) {
+                        return new JsonObject().put("rowsAffected", changed);
+                    } else {
+                        return new JsonObject().put("errors", new JsonArray().add(
+                                new JsonObject()
+                                .put("title", "Can't change object")));
+                    }
+                }
+//                case "UPDATE events SET edate = ?, ename = ?, ememo = ?, elen = ?, etag = ?, etags = ?, eurl = ?, stat = 3, stattime=(datetime('now')) WHERE id = ? AND stattime < ?":
+//                {
+//                
+//                }
                 case CHANGE_REC://"UPDATE events SET edate = ?, ename = ?, ememo = ?, elen = ?, etag = ?, etags = ?, eurl = ?, stat = 2, stattime=(datetime('now')) WHERE id = ? ";
                 {
                     
@@ -364,7 +407,7 @@ WITH jt1 AS
                     val[i] = args.getInteger(i);
                     try {
                         JsonArray rows = new JsonArray();
-                        for (final Object o : store.getObjects(null, Events.class, LINES, new String[val.length], val, null, null)) {
+                        for (final Object o : store.getObjects(null, Events.class, LINES1, new String[val.length], val, null, null)) {
                             rows.add(JsonObject.mapFrom(o));
                         }
                         return new JsonObject().put("data", new JsonObject().put("rows", rows));
@@ -413,6 +456,11 @@ WITH jt1 AS
                 .put("title", "err msg")
                 //
         ));
+    }
+    
+    private int toInt(Integer i) {
+        if (i == null) return 0;
+        return i;
     }
     
     private JsonObject byTagCount(final String byTagSql, final JsonArray args) {

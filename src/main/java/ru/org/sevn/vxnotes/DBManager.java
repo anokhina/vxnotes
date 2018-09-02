@@ -15,21 +15,33 @@
  */
 package ru.org.sevn.vxnotes;
 
+import java.io.File;
 import java.util.HashMap;
+import ru.org.sevn.common.FileUtil;
+import ru.org.sevn.common.SevnSettings;
 import ru.org.sevn.common.data.SimpleSqliteObjectStore;
 
 public class DBManager {
     private final static HashMap<String, SimpleSqliteObjectStore> map = new HashMap<>();
     
-    public static SimpleSqliteObjectStore getSimpleSqliteObjectStore(final String userName) {
+    public static SimpleSqliteObjectStore getSimpleSqliteObjectStore(final String userName, final String dbVariant) {
+        final String dbvar = getDbVariant(dbVariant);
         SimpleSqliteObjectStore ret;
         synchronized(map) {
-            ret = map.get(userName);
+            ret = map.get(userName + dbvar);
             if (ret == null) {
-                ret = new SimpleSqliteObjectStore("db/" + userName.trim() + "-events.db", new EventsMapper());
-                map.put(userName, ret);
+                final File dbDir = SevnSettings.mkdirs(new SevnSettings().getAppConfigFile("vxnotes", "db"));
+                ret = new SimpleSqliteObjectStore(new File(dbDir, FileUtil.replaceForbidden(userName.trim()) + dbvar + "-events.db").getAbsolutePath(), new EventsMapper());
+                map.put(userName + dbvar, ret);
             }
         }
         return ret;
+    }
+    
+    public static String getDbVariant(final String s) {
+        if (s == null) {
+            return "";
+        }
+        return "-" + FileUtil.replaceForbidden(s);
     }
 }

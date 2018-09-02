@@ -63,6 +63,9 @@ public class EventsMapper implements SimpleSqliteObjectStore.ObjectMapper<Events
             case Events.FIELD_STAT_TIME:
                 o.setStattime(rs.getDate(colName));
                 break;
+            case "dlen":
+                o.setDlen(rs.getString(colName));
+                break;
         }
     }
     

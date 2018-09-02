@@ -17,17 +17,31 @@ package ru.org.sevn.vxnotes;
 
 import ru.org.sevn.jvert.ServerVerticle;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.User;
 import io.vertx.ext.web.Route;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.ext.web.impl.RouterUtil;
+import java.io.File;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.velocity.Template;
+import org.apache.velocity.VelocityContext;
+import ru.org.sevn.common.FileUtil;
 import ru.org.sevn.jvert.AppAuth;
 import ru.org.sevn.jvert.ExtraUser;
 import ru.org.sevn.jvert.UserAuthorizedHandler;
+import ru.org.sevn.jvert.VertxOutputStream;
+import ru.org.sevn.jvert.VertxUtil;
+import ru.org.sevn.templ.TemplateEngine;
 
 public class AppVerticle extends AbstractVerticle {
     
@@ -38,6 +52,87 @@ public class AppVerticle extends AbstractVerticle {
         this.serverVerticle = serverVerticle;
     }
     
+    static class DBVariantHandler implements Handler<RoutingContext> {
+        private String webRoot;
+        final TemplateEngine templateEngine = new TemplateEngine(null);
+        private final String prefix;
+        
+        public DBVariantHandler(final String prefix) {
+            this.prefix = prefix;
+        }
+
+        public String getWebRoot() {
+            return webRoot;
+        }
+
+        public DBVariantHandler setWebRoot(String webRoot) {
+            this.webRoot = webRoot;
+            return this;
+        }
+        
+        @Override
+        public void handle(RoutingContext ctx) {
+            //System.out.println("*********" + ctx.request().getParam("dbvariant"));
+            final String dbvariant = ctx.request().getParam("dbvariant");
+            final String fullPrefix = prefix + "db/" + dbvariant + "/";
+            if (fullPrefix.length() < ctx.normalisedPath().length()) {
+                final String path = ctx.normalisedPath().substring(fullPrefix.length());
+                if (path.equals("events.html")) {
+                    final HashMap<String, Object> params = new HashMap<>();
+                    params.put("dbvariant", dbvariant);
+                    outHtml(ctx, path, params);
+                    return;
+                } else {
+                    VertxUtil.sendFile(ctx, new File(new File(webRoot), path));
+                    return;
+                }
+            }
+            ctx.next();
+        }
+        
+        private void outHtml(final RoutingContext ctx, final String templateName, final Map<String, Object> params) {
+            try {
+                Template templ = templateEngine.getVelocityEngine().getTemplate(templateName);
+
+                VelocityContext veloCtx = new VelocityContext(params);
+                ctx.response().putHeader("content-type", "text/html").setChunked(true);
+                try (VertxOutputStream vos = new VertxOutputStream(ctx.response())) {
+
+                    OutputStreamWriter writer = new OutputStreamWriter(vos, "UTF-8");
+                    templ.merge(veloCtx, writer);
+                    writer.flush();
+                }
+            } catch (Exception ex) {
+                Logger.getLogger(DBVariantHandler.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+        }
+    }
+    
+    static class EventsAppHandler implements Handler<RoutingContext> {
+
+        @Override
+        public void handle(final RoutingContext ctx) {
+            final String dbvariant = ctx.request().getParam("dbvariant");
+            System.out.println("*********" + ctx.request().getParam("dbvariant"));
+            JsonObject body = new JsonObject();
+            try {
+                body = ctx.getBodyAsJson();
+            } catch (io.vertx.core.json.DecodeException ex) {}
+            
+            final JsonObject joresponse = new NoteService(DBManager.getSimpleSqliteObjectStore(
+                    FileUtil.replaceForbidden(userName(ctx.user())), dbvariant
+            )).execute(body.getString("sql"), body.getJsonArray("args"));
+            if (joresponse.containsKey("errors")) {
+                System.out.println("==" + body.encodePrettily());
+                System.out.println(">>" + body.getString("sql"));
+            }
+            ctx.response().putHeader("content-type", "application/json")//; charset=utf-8
+                    .end(joresponse.encode());
+        }
+        
+    }
+    
     @Override
     public void start() throws Exception {
         super.start();
@@ -45,31 +140,17 @@ public class AppVerticle extends AbstractVerticle {
         final AppAuth appAuth = serverVerticle.getAppAuth();
         
         routers.add(router.route("/app/*").handler(appAuth.getAuthHandlerLogin()));
+        routers.add(router.route("/db/*").handler(appAuth.getAuthHandlerLogin()));
+        routers.add(router.route("/db/:dbvariant/app*").handler(new DBVariantHandler("/app/").setWebRoot("wwwapp")));
         routers.add(router.route("/app/*").handler(StaticHandler.create().setCachingEnabled(false).setWebRoot("wwwapp")));
         
         //routers.add(router.route("/vxnotes").handler(new RedirectUnAuthParamPageHandler("/test")));
-        routers.add(router.route("/vxnotes").handler(new UserAuthorizedHandler(appAuth.getAuthorizer(), ctx -> {
-            JsonObject body = new JsonObject();
-            try {
-                body = ctx.getBodyAsJson();
-            } catch (io.vertx.core.json.DecodeException ex) {}
-            
-            final JsonObject joresponse = new NoteService(DBManager.getSimpleSqliteObjectStore(replaceForbidden(userName(ctx.user())))).execute(body.getString("sql"), body.getJsonArray("args"));
-            if (joresponse.containsKey("errors")) {
-                System.out.println("==" + body.encodePrettily());
-                System.out.println(">>" + body.getString("sql"));
-            }
-            ctx.response().putHeader("content-type", "application/json")//; charset=utf-8
-                    .end(joresponse.encode());
-        })));
+        routers.add(router.route("/db/:dbvariant/vxnotes").handler(new UserAuthorizedHandler(appAuth.getAuthorizer(), new EventsAppHandler())));
+        routers.add(router.route("/vxnotes").handler(new UserAuthorizedHandler(appAuth.getAuthorizer(), new EventsAppHandler())));
         
     }
     
-    private String replaceForbidden(String str) {
-        return str.replaceAll("[^\\dA-Za-z ]", "_").replaceAll("\\s+", "-");
-    }
-    
-    private String userName(User u) {
+    private static String userName(User u) {
         if (u != null) {
             if (u instanceof ExtraUser) {
                 ExtraUser user = (ExtraUser) u;

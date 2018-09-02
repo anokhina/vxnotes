@@ -24,13 +24,14 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import ru.org.sevn.common.SevnSettings;
 import ru.org.sevn.jvert.StringIdHolder;
 
 public class Main {
     
     
     public static void main(String[] args) {
-        final File settingsFile = new File(new File(System.getProperty("user.home")), ".vxnotes.json");
+        final File settingsFile = new SevnSettings().getAppConfigFile("vxnotes", ".vxnotes.json");
         String salt = "salt";
         int port = 7777;
         try {
@@ -47,7 +48,7 @@ public class Main {
         
         final Vertx vertx = Vertx.vertx(new VertxOptions().setMaxEventLoopExecuteTime(2L * 1000 * 1000000));
         final ServerVerticle serverVerticle = new ServerVerticle("ru.org.sevn.vxnotes", port);
-        serverVerticle.getAppAuth().setSaltPrefix(salt).setInvitePath(new File(new File(System.getProperty("user.home")), "sevn-http-vert-users.json").getAbsolutePath());
+        serverVerticle.getAppAuth().setSaltPrefix(salt).setInvitePath(new SevnSettings().getAppConfigFile("vxnotes", "sevn-http-vert-users.json").getAbsolutePath());
         
         final AppVerticle appVerticle = new AppVerticle(serverVerticle);
         final StringIdHolder appVerticleId = new StringIdHolder();

@@ -31,7 +31,7 @@ public class Util {
     }
 
     public static Integer toInt(String s) {
-        if (s.length() == 0) {
+        if (s == null || s.length() == 0) {
             return 0;
         }
         return Integer.valueOf(s);

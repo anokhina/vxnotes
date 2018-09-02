@@ -87,6 +87,17 @@ public class Events {
     @DBProperty(name = FIELD_EMEMO, dtype = "TEXT")
     private String ememo;
 
+    private String dlen;
+
+    public String getDlen() {
+        return dlen;
+    }
+
+    public void setDlen(String dlen) {
+        this.dlen = dlen;
+    }
+    
+    
     public long getRid() {
         return rid;
     }
